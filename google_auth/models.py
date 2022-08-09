@@ -21,8 +21,8 @@ class TokenData(BaseModel):
 class User(BaseModel):
     id: int
     email: str = None
-    max_open: int = 0
-    admin: bool = False
+    max_unlock: int = 0
+    is_admin: bool = False
 
 
 class OAuth2PasswordBearerCookie(OAuth2):
