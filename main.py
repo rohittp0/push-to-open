@@ -84,6 +84,8 @@ def make_admin(email: str, user: User = Depends(get_current_user), db: Session =
     client.is_admin = True
     db.commit()
 
+    return responses.PlainTextResponse(content="Done 👍")
+
 
 @app.get("/award")
 def add_unlocks(email: str, unlocks: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
