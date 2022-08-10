@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from fastapi import HTTPException, APIRouter
 from fastapi.encoders import jsonable_encoder
+
 from google.auth.exceptions import GoogleAuthError
 
 from starlette.responses import JSONResponse, HTMLResponse, RedirectResponse
@@ -9,6 +10,7 @@ from starlette.requests import Request
 
 from google.oauth2 import id_token
 from google.auth.transport import requests
+from starlette.status import HTTP_403_FORBIDDEN
 
 from google_auth.dependencies import authenticate_user_email, create_access_token
 from google_auth.models import Token

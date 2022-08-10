@@ -1,4 +1,5 @@
 from asyncio import sleep
+from datetime import timedelta, datetime
 from typing import List
 
 from fastapi import FastAPI, Depends
@@ -9,8 +10,9 @@ from starlette import responses
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from google_auth import auth
-from google_auth.db import get_db, User
-from google_auth.dependencies import get_current_user
+from google_auth.db import get_db
+from google_auth.models import User, Unlocks
+from google_auth.dependencies import get_current_user, ensure_user
 
 app = FastAPI()
 
@@ -66,13 +68,31 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-@app.get("/award")
-def add_unlocks(email: str, unlocks: int,user: User = Depends(get_current_user)):
-    if not user or not user.is_admin:
+@app.get("/make_admin")
+def make_admin(email: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if ensure_user(user):
+        return ensure_user(user)
+
+    is_admin = user.is_admin or user.email == "tprohit9@gmail.com"
+
+    if not is_admin:
         return responses.PlainTextResponse(content="You are not allowed to do that",
                                            status_code=status.HTTP_400_BAD_REQUEST)
 
-    db: Session = next(get_db())
+    client: User = db.query(User).filter(User.email == email).first()
+
+    client.is_admin = True
+    db.commit()
+
+
+@app.get("/award")
+def add_unlocks(email: str, unlocks: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if ensure_user(user):
+        return ensure_user(user)
+
+    if not user or not user.is_admin:
+        return responses.PlainTextResponse(content="You are not allowed to do that",
+                                           status_code=status.HTTP_400_BAD_REQUEST)
 
     client: User = db.query(User).filter(User.email == email).first()
 
@@ -87,24 +107,25 @@ def add_unlocks(email: str, unlocks: int,user: User = Depends(get_current_user))
 
 
 @app.get("/")
-async def home(user: User | None = Depends(get_current_user)):
-    if not user:
-        return responses.RedirectResponse(url="/google_login_client",
-                                          status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+async def home(user: User | None = Depends(get_current_user), db: Session = Depends(get_db)):
+    if ensure_user(user):
+        return ensure_user(user)
 
     if user.max_unlock <= 0 and not user.is_admin:
         return responses.PlainTextResponse(content="Maximum unlock limit reached",
                                            status_code=status.HTTP_400_BAD_REQUEST)
 
-    if not user.is_admin:
-        db: Session = next(get_db())
+    num_unlocks = db.query(Unlocks).filter(Unlocks.user == user,
+                                           (Unlocks.date + timedelta(days=1)) > datetime.now()).count()
 
-        user = db.query(User).filter(User.id == user.id).first()
-        user.max_unlock -= 1
+    if not user.is_admin and num_unlocks >= user.max_unlock:
+        return responses.PlainTextResponse(content=f"Maximum unlock limit reached, limit: {user.max_unlock}",
+                                           status_code=status.HTTP_400_BAD_REQUEST)
 
-        db.commit()
-        db.refresh(user)
+    unlock = Unlocks(user_id=user.id)
+    db.add(unlock)
+    db.commit()
 
     await unlock_door()
 
-    return responses.PlainTextResponse(content=f"Door unlocked, {user.max_unlock} unlocks remaining")
+    return responses.PlainTextResponse(content=f"Door unlocked, {user.max_unlock - num_unlocks} unlocks remaining")
