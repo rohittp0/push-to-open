@@ -92,9 +92,9 @@ async def home(user: User | None = Depends(get_current_user)):
         return responses.RedirectResponse(url="/google_login_client",
                                           status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
-    # if user.max_unlock <= 0 and not user.is_admin:
-    #     return responses.PlainTextResponse(content="Maximum unlock limit reached",
-    #                                        status_code=status.HTTP_400_BAD_REQUEST)
+    if user.max_unlock <= 0 and not user.is_admin:
+        return responses.PlainTextResponse(content="Maximum unlock limit reached",
+                                           status_code=status.HTTP_400_BAD_REQUEST)
 
     if not user.is_admin:
         db: Session = next(get_db())
