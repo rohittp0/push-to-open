@@ -32,40 +32,27 @@ app.add_middleware(
 
 app.include_router(auth.router)
 
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-
-
-manager = ConnectionManager()
+lock_socket: WebSocket | None = None
 
 
 async def unlock_door():
-    await manager.broadcast("OPEN")
-    await sleep(3)
-    await manager.broadcast("CLOSE")
+    if not lock_socket:
+        return False
+
+    await lock_socket.send_text("OPEN")
+    return True
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    await websocket.accept()
+    global lock_socket
+    lock_socket = websocket
     try:
         while True:
             print(await websocket.receive_text())
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        lock_socket = None
 
 
 @app.get("/make_admin")
@@ -124,10 +111,12 @@ async def home(user: User | None = Depends(get_current_user), db: Session = Depe
         return responses.PlainTextResponse(content=f"Maximum unlock limit reached, limit: {user.max_unlock}",
                                            status_code=status.HTTP_400_BAD_REQUEST)
 
+    if not await unlock_door():
+        return responses.PlainTextResponse(content=f"Device offline please try again later",
+                                           status_code=status.HTTP_404_NOT_FOUND)
+
     unlock = Unlocks(user_id=user.id)
     db.add(unlock)
     db.commit()
-
-    await unlock_door()
 
     return responses.PlainTextResponse(content=f"Door unlocked, {user.max_unlock - num_unlocks} unlocks remaining")
