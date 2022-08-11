@@ -1,6 +1,4 @@
-from asyncio import sleep
 from datetime import timedelta, datetime
-from typing import List
 
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
@@ -119,4 +117,4 @@ async def home(user: User | None = Depends(get_current_user), db: Session = Depe
     db.add(unlock)
     db.commit()
 
-    return responses.HTMLResponse(content=f"<script type='text/javascript'>window.close() ;</script>")
+    return responses.PlainTextResponse(content=f"Door unlocked, {user.max_unlock - num_unlocks} unlocks remaining")
