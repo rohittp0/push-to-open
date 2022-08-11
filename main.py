@@ -119,4 +119,4 @@ async def home(user: User | None = Depends(get_current_user), db: Session = Depe
     db.add(unlock)
     db.commit()
 
-    return responses.PlainTextResponse(content=f"Door unlocked, {user.max_unlock - num_unlocks} unlocks remaining")
+    return responses.HTMLResponse(content=f"<script type='text/javascript'>window.close() ;</script>")
