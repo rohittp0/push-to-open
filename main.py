@@ -139,9 +139,9 @@ async def home(user: User | None = Depends(get_current_user), db: Session = Depe
         return responses.PlainTextResponse(content=f"Maximum unlock limit reached, limit: {user.max_unlock}",
                                            status_code=status.HTTP_400_BAD_REQUEST)
 
-    # if not await unlock_door():
-    #     return responses.PlainTextResponse(content=f"Device offline please try again later",
-    #                                        status_code=status.HTTP_404_NOT_FOUND)
+    if not await unlock_door():
+        return responses.PlainTextResponse(content=f"Device offline please try again later",
+                                           status_code=status.HTTP_404_NOT_FOUND)
 
     unlock = Unlocks(user_id=user.id, email=user.email)
     db.add(unlock)
