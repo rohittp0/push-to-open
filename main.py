@@ -1,6 +1,8 @@
-from datetime import timedelta, datetime
+from datetime import datetime, date
+from typing import List
 
 from fastapi import FastAPI, Depends
+from sqlalchemy import cast, Date,  func, and_
 from sqlalchemy.orm import Session
 from starlette import status
 from starlette.middleware.cors import CORSMiddleware
@@ -53,6 +55,30 @@ async def websocket_endpoint(websocket: WebSocket):
         lock_socket = None
 
 
+@app.get("/stats", response_model=List)
+def get_stats(email: str = None, day: date = None, user: User = Depends(get_current_user),
+              db: Session = Depends(get_db)):
+    if ensure_user(user):
+        return ensure_user(user)
+
+    if not user.is_admin:
+        return responses.PlainTextResponse(content="You are not allowed to do that",
+                                           status_code=status.HTTP_400_BAD_REQUEST)
+
+    unlocks = db.query(Unlocks)
+
+    if email:
+        client: User = db.query(User).filter(User.email == email).first()
+        c_id = client.id if client else -1
+        unlocks = unlocks.filter(Unlocks.user_id == c_id)
+
+    print(day)
+    if day:
+        unlocks = unlocks.filter(day == func.date(Unlocks.date))
+
+    return unlocks.all()
+
+
 @app.get("/make_admin")
 def make_admin(email: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if ensure_user(user):
@@ -66,6 +92,10 @@ def make_admin(email: str, user: User = Depends(get_current_user), db: Session =
 
     client: User = db.query(User).filter(User.email == email).first()
 
+    if client is None:
+        return responses.PlainTextResponse(content="User not found",
+                                    status_code=status.HTTP_400_BAD_REQUEST)
+
     client.is_admin = True
     db.commit()
 
@@ -77,14 +107,14 @@ def add_unlocks(email: str, unlocks: int, user: User = Depends(get_current_user)
     if ensure_user(user):
         return ensure_user(user)
 
-    if not user or not user.is_admin:
+    if not user.is_admin:
         return responses.PlainTextResponse(content="You are not allowed to do that",
                                            status_code=status.HTTP_400_BAD_REQUEST)
 
     client: User = db.query(User).filter(User.email == email).first()
 
-    if not client:
-        responses.PlainTextResponse(content="User not found",
+    if client is None:
+        return responses.PlainTextResponse(content="User not found",
                                     status_code=status.HTTP_400_BAD_REQUEST)
 
     client.max_unlock = unlocks
@@ -102,18 +132,18 @@ async def home(user: User | None = Depends(get_current_user), db: Session = Depe
         return responses.PlainTextResponse(content="Maximum unlock limit reached",
                                            status_code=status.HTTP_400_BAD_REQUEST)
 
-    num_unlocks = db.query(Unlocks).filter(Unlocks.user == user,
-                                           (Unlocks.date + timedelta(days=1)) > datetime.now()).count()
+    num_unlocks = db.query(Unlocks).filter(and_(Unlocks.user == user,
+                                           datetime.now().date() == func.date(Unlocks.date))).count()
 
     if not user.is_admin and num_unlocks >= user.max_unlock:
         return responses.PlainTextResponse(content=f"Maximum unlock limit reached, limit: {user.max_unlock}",
                                            status_code=status.HTTP_400_BAD_REQUEST)
 
-    if not await unlock_door():
-        return responses.PlainTextResponse(content=f"Device offline please try again later",
-                                           status_code=status.HTTP_404_NOT_FOUND)
+    # if not await unlock_door():
+    #     return responses.PlainTextResponse(content=f"Device offline please try again later",
+    #                                        status_code=status.HTTP_404_NOT_FOUND)
 
-    unlock = Unlocks(user_id=user.id)
+    unlock = Unlocks(user_id=user.id, email=user.email)
     db.add(unlock)
     db.commit()
 

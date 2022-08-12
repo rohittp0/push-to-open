@@ -27,6 +27,7 @@ class User(Base):
 class Unlocks(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey(User.id))
+    email = Column(String, ForeignKey(User.email))
     user = relationship("User", backref="Unlocks", foreign_keys="Unlocks.user_id")
     date = Column(DateTime, default=datetime.now)
 
