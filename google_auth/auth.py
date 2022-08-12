@@ -10,7 +10,6 @@ from starlette.requests import Request
 
 from google.oauth2 import id_token
 from google.auth.transport import requests
-from starlette.status import HTTP_403_FORBIDDEN
 
 from google_auth.dependencies import authenticate_user_email, create_access_token
 from google_auth.models import Token
@@ -24,7 +23,7 @@ API_LOCATION = f"{config['protocol']}{config['domain']}:{config['port']}"
 SWAP_TOKEN_ENDPOINT = "/swap_token"
 SUCCESS_ROUTE = "/"
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 24*60
 
 js_client = get_login_js(
     client_id=config['google']['id'],
@@ -83,8 +82,8 @@ async def swap_token(request: Request = None):
         value=f"Bearer {token}",
         domain=config["domain"],
         httponly=True,
-        max_age=1800,
-        expires=1800,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES*60,
+        expires=ACCESS_TOKEN_EXPIRE_MINUTES*60,
     )
     return response
 
