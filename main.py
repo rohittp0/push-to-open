@@ -2,7 +2,7 @@ from datetime import datetime, date
 from typing import List
 
 from fastapi import FastAPI, Depends
-from sqlalchemy import cast, Date,  func, and_
+from sqlalchemy import cast, Date, func, and_
 from sqlalchemy.orm import Session
 from starlette import status
 from starlette.middleware.cors import CORSMiddleware
@@ -55,9 +55,26 @@ async def websocket_endpoint(websocket: WebSocket):
         lock_socket = None
 
 
-@app.get("/stats", response_model=List)
-def get_stats(email: str = None, day: date = None, user: User = Depends(get_current_user),
-              db: Session = Depends(get_db)):
+@app.get("/stats/users", response_model=List)
+def get_users(include_admin=True, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if ensure_user(user):
+        return ensure_user(user)
+
+    if not user.is_admin:
+        return responses.PlainTextResponse(content="You are not allowed to do that",
+                                           status_code=status.HTTP_400_BAD_REQUEST)
+
+    query = db.query(User)
+
+    if not include_admin:
+        query.filter(User.is_admin is False)
+
+    return query.all()
+
+
+@app.get("/stats/unlocks", response_model=List)
+def get_unlocks(email: str = None, day: date = None, user: User = Depends(get_current_user),
+                db: Session = Depends(get_db)):
     if ensure_user(user):
         return ensure_user(user)
 
@@ -72,11 +89,10 @@ def get_stats(email: str = None, day: date = None, user: User = Depends(get_curr
         c_id = client.id if client else -1
         unlocks = unlocks.filter(Unlocks.user_id == c_id)
 
-    print(day)
     if day:
         unlocks = unlocks.filter(day == func.date(Unlocks.date))
 
-    return unlocks.all()
+    return unlocks.order_by(Unlocks.date.desc(), Unlocks.email).all()
 
 
 @app.get("/make_admin")
@@ -94,7 +110,7 @@ def make_admin(email: str, user: User = Depends(get_current_user), db: Session =
 
     if client is None:
         return responses.PlainTextResponse(content="User not found",
-                                    status_code=status.HTTP_400_BAD_REQUEST)
+                                           status_code=status.HTTP_400_BAD_REQUEST)
 
     client.is_admin = True
     db.commit()
@@ -115,7 +131,7 @@ def add_unlocks(email: str, unlocks: int, user: User = Depends(get_current_user)
 
     if client is None:
         return responses.PlainTextResponse(content="User not found",
-                                    status_code=status.HTTP_400_BAD_REQUEST)
+                                           status_code=status.HTTP_400_BAD_REQUEST)
 
     client.max_unlock = unlocks
     db.commit()
@@ -133,7 +149,7 @@ async def home(user: User | None = Depends(get_current_user), db: Session = Depe
                                            status_code=status.HTTP_400_BAD_REQUEST)
 
     num_unlocks = db.query(Unlocks).filter(and_(Unlocks.user == user,
-                                           datetime.now().date() == func.date(Unlocks.date))).count()
+                                                datetime.now().date() == func.date(Unlocks.date))).count()
 
     if not user.is_admin and num_unlocks >= user.max_unlock:
         return responses.PlainTextResponse(content=f"Maximum unlock limit reached, limit: {user.max_unlock}",
