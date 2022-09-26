@@ -2,7 +2,7 @@ from datetime import datetime, date
 from typing import List
 
 from fastapi import FastAPI, Depends
-from sqlalchemy import cast, Date, func, and_
+from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 from starlette import status
 from starlette.middleware.cors import CORSMiddleware

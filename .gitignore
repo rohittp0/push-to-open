@@ -3,4 +3,3 @@ venv
 .idea
 .env
 *.db
-google_client_secret.json
