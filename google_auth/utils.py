@@ -17,7 +17,8 @@ def set_up():
         "domain": os.getenv("DOMAIN"),
         "protocol": os.getenv("PROTOCOL", "https://"),
         "port": os.getenv("PORT", 443),
-        "db": os.getenv("DATABASE", "sqlite:///./test.db")
+        "db": os.getenv("DATABASE", "sqlite:///./test.db"),
+        "form": os.getenv("REQUEST_FORM", "https://ugcsct.cusat.ac.in/")
     }
 
     return config

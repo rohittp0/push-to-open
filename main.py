@@ -13,7 +13,9 @@ from google_auth import auth
 from google_auth.db import get_db
 from google_auth.models import User, Unlocks
 from google_auth.dependencies import get_current_user, ensure_user
+from google_auth.utils import set_up
 
+config = set_up()
 app = FastAPI()
 
 origins = [
@@ -145,8 +147,8 @@ async def home(user: User | None = Depends(get_current_user), db: Session = Depe
         return ensure_user(user)
 
     if user.max_unlock <= 0 and not user.is_admin:
-        return responses.PlainTextResponse(content="Maximum unlock limit reached",
-                                           status_code=status.HTTP_400_BAD_REQUEST)
+        return responses.RedirectResponse(url=config["form"],
+                                          status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
     num_unlocks = db.query(Unlocks).filter(and_(Unlocks.user == user,
                                                 datetime.now().date() == func.date(Unlocks.date))).count()
