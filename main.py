@@ -8,6 +8,7 @@ from starlette import status
 from starlette.middleware.cors import CORSMiddleware
 from starlette import responses
 from starlette.websockets import WebSocket, WebSocketDisconnect
+from websockets.exceptions import ConnectionClosedError
 
 from google_auth import auth
 from google_auth.db import get_db
@@ -53,7 +54,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             print(await websocket.receive_text())
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, ConnectionClosedError):
         lock_socket = None
 
 
